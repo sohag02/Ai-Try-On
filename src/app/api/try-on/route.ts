@@ -5,11 +5,11 @@ import AWS from 'aws-sdk';
 
 async function uploadToS3(file: File): Promise<string> {
   const s3 = new AWS.S3({
-    endpoint: process.env.CLOUDFLARE_R2_ENDPOINT, // e.g., 'https://<account_id>.r2.cloudflarestorage.com'
+    endpoint: process.env.CLOUDFLARE_R2_ENDPOINT,
     accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID,
     secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
-    region: 'auto',
     signatureVersion: 'v4',
+    s3ForcePathStyle: true,  // Required for R2 compatibility
   });
 
   const fileName = file.name;
@@ -17,7 +17,7 @@ async function uploadToS3(file: File): Promise<string> {
 
   const uploadParams = {
     Bucket: 'ai-try-on', // Your Cloudflare R2 bucket name
-    Key: fileName,       // File name or key for the object
+    Key: fileName,
     Body: Buffer.from(fileContent), // Convert ArrayBuffer to Buffer
     ContentType: file.type,
   };

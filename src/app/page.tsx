@@ -192,7 +192,7 @@ export default function LandingPage() {
               <h2 className="text-2xl font-bold mb-4">Result</h2>
               <div className="relative w-[400px] h-[400px] mx-auto">
                 {isResultLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 rounded-lg z-10">
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 rounded-lg">
                     <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                   </div>
                 )}
@@ -201,8 +201,8 @@ export default function LandingPage() {
                   alt="Processed Image"
                   width={400}
                   height={400}
-                  className="mx-auto rounded-lg relative z-20"
-                  // onLoad={() => setIsResultLoading(false)}
+                  className="mx-auto rounded-lg"
+                  onLoad={() => setIsResultLoading(false)}
                 />
               </div>
               {/* Download Button */}

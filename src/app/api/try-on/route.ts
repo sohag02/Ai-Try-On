@@ -1,25 +1,9 @@
 // app/api/try-on/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, readFile, mkdir, unlink } from 'fs/promises';
-import path from 'path';
 import { Client, handle_file } from "@gradio/client";
 
-async function ensureDirectoryExists(dirPath: string) {
+async function processImages(personImageBuffer: ArrayBuffer, garmentImageBuffer: ArrayBuffer): Promise<string> {
   try {
-    await mkdir(dirPath, { recursive: true });
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
-      throw error;
-    }
-  }
-}
-
-async function processImages(personImagePath: string, garmentImagePath: string): Promise<string> {
-  try {
-    // Read the uploaded images
-    const personImageBuffer = await readFile(personImagePath);
-    const garmentImageBuffer = await readFile(garmentImagePath);
-
     // Convert buffers to blobs
     const personImageBlob = new Blob([personImageBuffer], { type: 'image/png' });
     const garmentImageBlob = new Blob([garmentImageBuffer], { type: 'image/png' });
@@ -37,6 +21,7 @@ async function processImages(personImagePath: string, garmentImagePath: string):
       30, // Denoising Steps
       42, // Seed
     ]);
+
     // Return the URL of the processed image
     return (result.data as { url: string }[])[0].url;
   } catch (error) {
@@ -46,7 +31,6 @@ async function processImages(personImagePath: string, garmentImagePath: string):
 }
 
 export async function POST(request: NextRequest) {
-  const tmpFiles: string[] = [];
   try {
     const formData = await request.formData();
     const personImage = formData.get('personImage') as File;
@@ -56,20 +40,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Both person and garment images are required' }, { status: 400 });
     }
 
-    // Create a temporary directory to store uploaded files
-    const tmpDir = path.join(process.cwd(), 'tmp');
-    await ensureDirectoryExists(tmpDir);
-
-    const personImagePath = path.join(tmpDir, personImage.name);
-    const garmentImagePath = path.join(tmpDir, garmentImage.name);
-
-    tmpFiles.push(personImagePath, garmentImagePath);
-
-    await writeFile(personImagePath, Buffer.from(await personImage.arrayBuffer()));
-    await writeFile(garmentImagePath, Buffer.from(await garmentImage.arrayBuffer()));
+    const personImageBuffer = await personImage.arrayBuffer();
+    const garmentImageBuffer = await garmentImage.arrayBuffer();
 
     // Process the images and get the result URL
-    const resultImageUrl = await processImages(personImagePath, garmentImagePath);
+    const resultImageUrl = await processImages(personImageBuffer, garmentImageBuffer);
 
     return NextResponse.json({ 
       message: 'Images processed successfully',
@@ -79,14 +54,5 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error processing images:', error);
     return NextResponse.json({ error: 'Internal server error', details: (error as Error).message }, { status: 500 });
-  } finally {
-    // Delete temporary files
-    for (const file of tmpFiles) {
-      try {
-        await unlink(file);
-      } catch (error) {
-        console.error(`Failed to delete temporary file ${file}:`, error);
-      }
-    }
   }
 }

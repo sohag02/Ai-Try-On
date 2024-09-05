@@ -1,101 +1,247 @@
-import Image from "next/image";
+"use client"
+import { useState, useCallback } from 'react'
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Upload, Shirt, ShieldCheck, Loader2, X, Github, Download } from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
 
-export default function Home() {
+export default function LandingPage() {
+  const [personImage, setPersonImage] = useState<File | null>(null)
+  const [garmentImage, setGarmentImage] = useState<File | null>(null)
+  const [personPreview, setPersonPreview] = useState<string | null>(null)
+  const [garmentPreview, setGarmentPreview] = useState<string | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [resultImageUrl, setResultImageUrl] = useState<string | null>(null)
+  const [isResultLoading, setIsResultLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleImageUpload = useCallback((setter: React.Dispatch<React.SetStateAction<File | null>>, previewSetter: React.Dispatch<React.SetStateAction<string | null>>) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0]
+      setter(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        previewSetter(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }, [])
+
+  const handlePersonImageUpload = handleImageUpload(setPersonImage, setPersonPreview)
+  const handleGarmentImageUpload = handleImageUpload(setGarmentImage, setGarmentPreview)
+
+  const handleProcessing = async () => {
+    if (!personImage || !garmentImage) return
+
+    setIsProcessing(true)
+    setResultImageUrl(null)
+    setError(null)
+
+    const formData = new FormData()
+    formData.append('personImage', personImage)
+    formData.append('garmentImage', garmentImage)
+
+    try {
+      const response = await fetch('/api/try-on', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to process images')
+      }
+
+      const result = await response.json()
+      setResultImageUrl(result.resultImage)
+      setIsResultLoading(true)
+    } catch (error) {
+      console.error('Error:', error)
+      setError('An error occurred while processing the images. Please try again.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const clearImage = useCallback((setter: React.Dispatch<React.SetStateAction<File | null>>, previewSetter: React.Dispatch<React.SetStateAction<string | null>>) => () => {
+    setter(null)
+    previewSetter(null)
+  }, [])
+
+  const downloadImage = useCallback((url: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'result.png'); // Ensures the download attribute is set
+    link.setAttribute('target', '_blank'); // Opens in a new tab in case it's necessary
+    document.body.appendChild(link); // Append link to body for it to work in Firefox
+    link.click();
+    document.body.removeChild(link); // Clean up after the download is triggered
+  }, []);
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="min-h-screen bg-gray-900 text-gray-100">
+      <header className="container mx-auto px-4 py-6 flex justify-between items-center">
+        <Link href="/" className="flex items-center space-x-2">
+          <Shirt className="h-8 w-8" />
+          <span className="text-2xl font-bold">AI Try-On</span>
+        </Link>
+        <nav className="space-x-4">
+          <Link href="https://github.com/sohag02/Ai-Try-On">
+            <Button variant="outline">
+              <Github className="mr-2 h-4 w-4" /> Github
+            </Button>
+          </Link>
+        </nav>
+      </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+      <main>
+        <section className="container mx-auto px-4 py-20 text-center">
+          <h1 className="text-5xl font-bold mb-6">Try On Clothes Virtually with AI</h1>
+          <p className="text-xl mb-8 text-gray-400">Upload your photo and a garment to see how you would look!</p>
+          
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {/* Person Image Upload */}
+            <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+              <Label htmlFor="person-upload" className="block text-lg mb-4">Upload Your Photo</Label>
+              <div className="relative">
+                <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-gray-500 transition-colors">
+                  <Input id="person-upload" type="file" className="hidden" onChange={handlePersonImageUpload} />
+                  {personPreview ? (
+                    <Image src={personPreview} alt="Person preview" width={200} height={200} className="mx-auto rounded-lg" />
+                  ) : (
+                    <>
+                      <Upload className="mx-auto h-12 w-12 text-gray-500 mb-4" />
+                      <p className="text-gray-500">Drag and drop your photo here, or click to select</p>
+                      <Button className="w-full mt-2" onClick={() => document.getElementById('person-upload')?.click()}>
+                        <Upload className="mr-2 h-4 w-4" /> Upload Your Photo
+                      </Button>
+                    </>
+                  )}
+                </div>
+                {personPreview && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 bg-gray-800 rounded-full"
+                    onClick={clearImage(setPersonImage, setPersonPreview)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Garment Image Upload */}
+            <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+              <Label htmlFor="garment-upload" className="block text-lg mb-4">Upload Garment Image</Label>
+              <div className="relative">
+                <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-gray-500 transition-colors">
+                  <Input id="garment-upload" type="file" className="hidden" onChange={handleGarmentImageUpload} />
+                  {garmentPreview ? (
+                    <Image src={garmentPreview} alt="Garment preview" width={200} height={200} className="mx-auto rounded-lg" />
+                  ) : (
+                    <>
+                      <Shirt className="mx-auto h-12 w-12 text-gray-500 mb-4" />
+                      <p className="text-gray-500">Drag and drop garment image here, or click to select</p>
+                      <Button className="w-full mt-2" onClick={() => document.getElementById('garment-upload')?.click()}>
+                        <Upload className="mr-2 h-4 w-4" /> Upload Your Photo
+                      </Button>
+                    </>
+                  )}
+                </div>
+                {garmentPreview && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 bg-gray-800 rounded-full"
+                    onClick={clearImage(setGarmentImage, setGarmentPreview)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8">
+            <Button 
+              onClick={handleProcessing} 
+              disabled={!personImage || !garmentImage || isProcessing}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                'Start Processing'
+              )}
+            </Button>
+          </div>
+
+          {error && (
+            <div className="mt-4 text-red-500">
+              {error}
+            </div>
+          )}
+
+          {resultImageUrl && (
+            <div className="mt-8">
+              <h2 className="text-2xl font-bold mb-4">Result</h2>
+              <div className="relative w-[400px] h-[400px] mx-auto">
+                {isResultLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 rounded-lg z-10">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  </div>
+                )}
+                <Image
+                  src={resultImageUrl}
+                  alt="Processed Image"
+                  width={400}
+                  height={400}
+                  className="mx-auto rounded-lg relative z-20"
+                  // onLoad={() => setIsResultLoading(false)}
+                />
+              </div>
+              {/* Download Button */}
+              <Button
+                variant="secondary"
+                className="mt-4 w-[400px] text-xl"
+                onClick={() => downloadImage(resultImageUrl)}
+              >
+                <Download className="mr-4 h-6 w-6" /> Download Image
+              </Button>
+            </div>
+          )}
+
+          <div className="mt-6 flex items-center justify-center text-gray-400">
+            <ShieldCheck className="h-5 w-5 mr-2" />
+            <p className="text-sm">We respect your privacy. Images are not stored and are deleted after processing.</p>
+          </div>
+        </section>
+
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+      <footer className="bg-gray-900 text-gray-400 py-8">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="mb-4 md:mb-0">
+              <Link href="/" className="flex items-center space-x-2">
+                <Shirt className="h-6 w-6" />
+                <span className="text-xl font-bold text-white">AI Try-On</span>
+              </Link>
+            </div>
+            <nav className="flex space-x-4">
+              <Link href="https://github.com/sohag02/Ai-Try-On" className="hover:text-gray-300">Made By @Sohag02</Link>
+            </nav>
+          </div>
+          <div className="mt-4 text-center text-sm">
+            © {new Date().getFullYear()} AI Try-On. All rights reserved.
+          </div>
+        </div>
       </footer>
     </div>
-  );
+  )
 }

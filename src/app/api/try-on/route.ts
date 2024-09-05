@@ -1,20 +1,62 @@
 // app/api/try-on/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, handle_file } from "@gradio/client";
+import AWS from 'aws-sdk';
 
-async function processImages(personImageBuffer: ArrayBuffer, garmentImageBuffer: ArrayBuffer): Promise<string> {
+async function uploadToS3(file: File): Promise<string> {
+  const s3 = new AWS.S3({
+    endpoint: process.env.CLOUDFLARE_R2_ENDPOINT, // e.g., 'https://<account_id>.r2.cloudflarestorage.com'
+    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+    region: 'auto',
+    signatureVersion: 'v4',
+  });
+
+  const fileName = file.name;
+  const fileContent = await file.arrayBuffer();
+
+  const uploadParams = {
+    Bucket: 'ai-try-on', // Your Cloudflare R2 bucket name
+    Key: fileName,       // File name or key for the object
+    Body: Buffer.from(fileContent), // Convert ArrayBuffer to Buffer
+    ContentType: file.type,
+  };
+
+  try {
+    // Upload the file to Cloudflare R2
+    await s3.upload(uploadParams).promise();
+
+    // Generate a pre-signed URL (temporary access to the file)
+    const signedUrlParams = {
+      Bucket: uploadParams.Bucket,
+      Key: fileName,
+      Expires: 60 * 60, // URL expiration in seconds (1 hour)
+    };
+
+    // Generate the pre-signed URL
+    const url = await s3.getSignedUrlPromise('getObject', signedUrlParams);
+
+    return url; // Return the pre-signed URL
+  } catch (error) {
+    console.error('Error uploading to S3:', error);
+    throw error;
+  }
+}
+
+
+async function processImages(personImageBuffer: string, garmentImageBuffer: string): Promise<string> {
   try {
     // Convert buffers to blobs
-    const personImageBlob = new Blob([personImageBuffer], { type: 'image/png' });
-    const garmentImageBlob = new Blob([garmentImageBuffer], { type: 'image/png' });
+    // const personImageBlob = new Blob([personImageBuffer], { type: 'image/png' });
+    // const garmentImageBlob = new Blob([garmentImageBuffer], { type: 'image/png' });
 
     // Initialize the Gradio client
     const app = await Client.connect("yisol/IDM-VTON");
 
     // Predict using the IDM-VTON model
     const result = await app.predict("/tryon", [
-      {"background": handle_file(personImageBlob), "layers": [], "composite": null},
-      handle_file(garmentImageBlob),
+      {"background": handle_file(personImageBuffer), "layers": [], "composite": null},
+      handle_file(garmentImageBuffer),
       "Processing image", // Text parameter
       true, // Checkbox parameter
       true, // Checkbox parameter
@@ -30,6 +72,7 @@ async function processImages(personImageBuffer: ArrayBuffer, garmentImageBuffer:
   }
 }
 
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -40,11 +83,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Both person and garment images are required' }, { status: 400 });
     }
 
-    const personImageBuffer = await personImage.arrayBuffer();
-    const garmentImageBuffer = await garmentImage.arrayBuffer();
+    // const personImageBuffer = await personImage.arrayBuffer();
+    // const garmentImageBuffer = await garmentImage.arrayBuffer();
+    const personImageURL = await uploadToS3(personImage);
+    const garmentImageURL = await uploadToS3(garmentImage);
 
     // Process the images and get the result URL
-    const resultImageUrl = await processImages(personImageBuffer, garmentImageBuffer);
+    const resultImageUrl = await processImages(personImageURL, garmentImageURL);
 
     return NextResponse.json({ 
       message: 'Images processed successfully',
